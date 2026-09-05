@@ -186,9 +186,12 @@ step = st.slider(
 raw_labels = labels_at_step(instance.n_points, result.merges, step)
 dendro_col, scatter_col = st.columns(2)
 with dendro_col:
-    st.plotly_chart(build_dendrogram_figure(instance.n_points, result.merges, step), width="stretch")
+    st.plotly_chart(
+        build_dendrogram_figure(instance.n_points, result.merges, step), width="stretch",
+        key=f"dendrogram_{step}",
+    )
 with scatter_col:
-    st.plotly_chart(build_scatter_figure(instance, raw_labels), width="stretch")
+    st.plotly_chart(build_scatter_figure(instance, raw_labels), width="stretch", key=f"raw_scatter_{step}")
 
 st.markdown("---")
 
@@ -201,9 +204,12 @@ st.caption(
 
 tree_col, final_col = st.columns(2)
 with tree_col:
-    st.plotly_chart(build_condensed_tree_figure(result.condensed_nodes, result.selected), width="stretch")
+    st.plotly_chart(
+        build_condensed_tree_figure(result.condensed_nodes, result.selected), width="stretch",
+        key="condensed_tree",
+    )
 with final_col:
-    st.plotly_chart(build_scatter_figure(instance, result.final_labels), width="stretch")
+    st.plotly_chart(build_scatter_figure(instance, result.final_labels), width="stretch", key="final_scatter")
 
 n_clusters = len(set(l for l in result.final_labels if l != -1))
 n_noise = sum(1 for l in result.final_labels if l == -1)
@@ -253,7 +259,7 @@ ri = rand_index(instance.true_labels, result.final_labels)
 
 bar_col, metric_col = st.columns([3, 2])
 with bar_col:
-    st.plotly_chart(build_noise_fraction_bar_chart(group_fractions), width="stretch")
+    st.plotly_chart(build_noise_fraction_bar_chart(group_fractions), width="stretch", key="noise_fraction_bar")
 with metric_col:
     st.metric(
         "Rand-Index gegen wahre Gruppen", f"{ri:.2f}",
