@@ -23,12 +23,27 @@ def _axis_range(data):
     return [xmin - padx, xmax + padx], [ymin - pady, ymax + pady]
 
 
+def _cluster_color(index, n_clusters):
+    """Bei bis zu len(CLUSTER_PALETTE) Clustern exakt die feste, qualitative Palette (wie
+    in den uebrigen Demos). Die rohe Single-Linkage-Animation durchlaeuft aber auch sehr
+    frueh Schritte mit weit mehr als 8 gleichzeitig existierenden (noch kaum fusionierten)
+    Clustern - ein Modulo auf die 8-Farben-Palette wuerde dort GENUINELY verschiedene
+    Cluster optisch ununterscheidbar machen. Ab mehr als 8 Clustern deshalb ein Farbrad
+    (HSL, gleichmaessig ueber alle aktuell existierenden Cluster verteilt), das fuer jede
+    Clusteranzahl paarweise unterschiedliche Farben garantiert."""
+    if n_clusters <= len(CLUSTER_PALETTE):
+        return CLUSTER_PALETTE[index % len(CLUSTER_PALETTE)]
+    hue = (index * 360.0 / n_clusters) % 360
+    return f"hsl({hue:.1f}, 65%, 50%)"
+
+
 def _cluster_traces(data, labels, legend):
     import plotly.graph_objects as go
 
     traces = []
     cluster_ids = sorted(l for l in set(labels.tolist()) if l != NOISE)
-    show_legend = legend and len(cluster_ids) <= MAX_LEGEND_CLUSTERS
+    n_clusters = len(cluster_ids)
+    show_legend = legend and n_clusters <= MAX_LEGEND_CLUSTERS
 
     mask_noise = labels == NOISE
     if mask_noise.any():
@@ -40,9 +55,9 @@ def _cluster_traces(data, labels, legend):
                 hoverinfo="skip",
             )
         )
-    for cid in cluster_ids:
+    for index, cid in enumerate(cluster_ids):
         mask = labels == cid
-        color = CLUSTER_PALETTE[cid % len(CLUSTER_PALETTE)]
+        color = _cluster_color(index, n_clusters)
         traces.append(
             go.Scatter(
                 x=data[mask, 0], y=data[mask, 1], mode="markers", name=f"Cluster {cid + 1}",
