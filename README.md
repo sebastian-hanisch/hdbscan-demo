@@ -1,5 +1,7 @@
 # HDBSCAN: die Kombination, die Dichte UND Chaining löst – Streamlit-Demo
 
+**[→ Demo live ausprobieren](https://sebastianhanisch-hdbscan-demo.streamlit.app/)**
+
 Fünftes Stück der "Konzepte"-Reihe für die Website "Sebastian Hanisch – Operations
 Research und Machine Learning" - der **Zusammenfluss** der Clustering-Linie:
 
