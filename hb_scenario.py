@@ -28,10 +28,12 @@ class ClusteringInstance:
         return np.array(self.points, dtype=float)
 
 
-def _cluster_stds(k, spread, density_imbalance):
-    """Wie dbscan-demo/db_scenario.py: Cluster 0 wird mit wachsendem density_imbalance
-    diffuser (groessere Streuung bei gleicher Punktzahl, also geringere lokale Dichte)."""
-    base_std = max(spread, MIN_STD_FRACTION) * RING_RADIUS
+def _cluster_stds(k, density_imbalance, base_std):
+    """Wie dbscan-demo/db_scenario.py's _group_scales: Cluster 0 wird mit wachsendem
+    density_imbalance diffuser (groessere Streuung bei gleicher Punktzahl, also geringere
+    lokale Dichte) - die uebrigen entsprechend enger. `base_std` ist die Basis-Streuung vor
+    der Ungleichgewichts-Skalierung (blobs und moons rufen dieselbe Funktion mit
+    unterschiedlichem `base_std` auf, statt die Formel je Form zu duplizieren)."""
     stds = np.full(k, base_std)
     if k > 1:
         stds[0] *= 1 + density_imbalance
@@ -42,7 +44,8 @@ def _cluster_stds(k, spread, density_imbalance):
 def _generate_blobs(n_points, k, spread, density_imbalance, rng):
     angles = np.linspace(0, 2 * np.pi, k, endpoint=False) + rng.uniform(-0.15, 0.15, size=k)
     centers = np.stack([RING_RADIUS * np.cos(angles), RING_RADIUS * np.sin(angles)], axis=1)
-    stds = _cluster_stds(k, spread, density_imbalance)
+    base_std = max(spread, MIN_STD_FRACTION) * RING_RADIUS
+    stds = _cluster_stds(k, density_imbalance, base_std)
 
     counts = np.full(k, n_points // k)
     counts[-1] += n_points - counts.sum()
@@ -63,10 +66,7 @@ def _generate_moons(n_points, k, spread, density_imbalance, rng):
     counts = np.full(k, n_points // k)
     counts[-1] += n_points - counts.sum()
     base_noise_std = max(spread, MIN_STD_FRACTION) * ARC_RADIUS * 0.3
-    noise_stds = np.full(k, base_noise_std)
-    if k > 1:
-        noise_stds[0] *= 1 + density_imbalance
-        noise_stds[1:] *= max(1 - 0.6 * density_imbalance, MIN_STD_FRACTION)
+    noise_stds = _cluster_stds(k, density_imbalance, base_noise_std)
 
     if k == 2:
         t1 = rng.uniform(0, np.pi, counts[0])
