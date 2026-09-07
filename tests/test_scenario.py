@@ -49,3 +49,51 @@ def test_density_imbalance_lowers_local_density_of_group_zero():
     nn_group0 = mean_nn_distance(points[labels == 0])
     nn_others = np.mean([mean_nn_distance(points[labels == i]) for i in (1, 2)])
     assert nn_group0 > nn_others * 1.5
+
+
+def test_default_shape_is_blobs():
+    instance = generate_instance(n_points=60, k=3, spread=0.2, density_imbalance=0.0, bridge_strength=0.0, seed=1)
+    assert instance.shape == "blobs"
+
+
+def test_moons_shape_produces_two_balanced_groups():
+    instance = generate_instance(
+        n_points=100, k=2, spread=0.1, density_imbalance=0.0, bridge_strength=0.0, seed=5, shape="moons"
+    )
+    assert instance.shape == "moons"
+    labels = np.array(instance.true_labels)
+    counts = np.bincount(labels, minlength=2)
+    assert counts[0] == 50 and counts[1] == 50
+
+
+def test_moons_shape_with_k_greater_than_two_produces_k_balanced_arcs():
+    instance = generate_instance(
+        n_points=200, k=4, spread=0.1, density_imbalance=0.0, bridge_strength=0.0, seed=6, shape="moons"
+    )
+    labels = np.array(instance.true_labels)
+    counts = np.bincount(labels, minlength=4)
+    assert counts.min() == counts.max() == 50
+
+
+def test_density_imbalance_lowers_local_density_of_group_zero_for_moons_too():
+    instance = generate_instance(
+        n_points=200, k=2, spread=0.1, density_imbalance=0.9, bridge_strength=0.0, seed=7, shape="moons"
+    )
+    points = np.array(instance.points)
+    labels = np.array(instance.true_labels)
+
+    def mean_nn_distance(group_points):
+        d = np.sqrt(((group_points[:, None, :] - group_points[None, :, :]) ** 2).sum(axis=2))
+        np.fill_diagonal(d, np.inf)
+        return d.min(axis=1).mean()
+
+    nn_group0 = mean_nn_distance(points[labels == 0])
+    nn_group1 = mean_nn_distance(points[labels == 1])
+    assert nn_group0 > nn_group1 * 1.5
+
+
+def test_bridge_works_for_moons_too():
+    instance = generate_instance(
+        n_points=100, k=2, spread=0.1, density_imbalance=0.0, bridge_strength=1.0, seed=2, shape="moons"
+    )
+    assert instance.true_labels.count(-1) == 80  # 100% von MAX_BRIDGE_POINTS (80)

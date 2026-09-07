@@ -20,6 +20,10 @@ class SettingSpec:
     hi: Optional[float] = None
 
 
+def _shape_caster(v):
+    return v if v in C.SHAPES else C.DEFAULT_SHAPE
+
+
 SETTING_SPECS = {
     "n_points_slider": SettingSpec("n", int, C.DEFAULT_N_POINTS, C.N_POINTS_MIN, C.N_POINTS_MAX),
     "k_slider": SettingSpec("k", int, C.DEFAULT_K, C.K_MIN, C.K_MAX),
@@ -31,6 +35,7 @@ SETTING_SPECS = {
         "bridge", float, C.DEFAULT_BRIDGE_STRENGTH, C.BRIDGE_STRENGTH_MIN, C.BRIDGE_STRENGTH_MAX
     ),
     "seed_input": SettingSpec("seed", int, C.DEFAULT_SEED, 0, 2_000_000_000),
+    "shape_radio": SettingSpec("shape", _shape_caster, C.DEFAULT_SHAPE),
     "min_cluster_size_slider": SettingSpec(
         "mcs", int, C.DEFAULT_MIN_CLUSTER_SIZE, C.MIN_CLUSTER_SIZE_MIN, C.MIN_CLUSTER_SIZE_MAX
     ),
@@ -71,7 +76,9 @@ def load_permalink_settings():
     st.session_state["permalink_loaded"] = True
 
 
-def sync_query_params(n_points, k, spread, density_imbalance, bridge_strength, seed, min_cluster_size, min_samples):
+def sync_query_params(
+    n_points, k, spread, density_imbalance, bridge_strength, seed, shape, min_cluster_size, min_samples
+):
     try:
         st.query_params["n"] = str(int(n_points))
         st.query_params["k"] = str(int(k))
@@ -79,6 +86,7 @@ def sync_query_params(n_points, k, spread, density_imbalance, bridge_strength, s
         st.query_params["dimb"] = str(density_imbalance)
         st.query_params["bridge"] = str(bridge_strength)
         st.query_params["seed"] = str(int(seed))
+        st.query_params["shape"] = shape
         st.query_params["mcs"] = str(int(min_cluster_size))
         st.query_params["minpts"] = str(int(min_samples))
     except Exception:
@@ -92,6 +100,7 @@ def apply_preset(name):
     st.session_state["spread_slider"] = p["spread"]
     st.session_state["density_imbalance_slider"] = p["density_imbalance"]
     st.session_state["bridge_strength_slider"] = p["bridge_strength"]
+    st.session_state["shape_radio"] = p["shape"]
     st.session_state["min_cluster_size_slider"] = p["min_cluster_size"]
     st.session_state["min_samples_slider"] = p["min_samples"]
     st.session_state["seed_input"] = p["seed"]

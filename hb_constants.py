@@ -6,6 +6,7 @@ DEFAULT_SPREAD = 0.15
 DEFAULT_DENSITY_IMBALANCE = 0.0
 DEFAULT_BRIDGE_STRENGTH = 0.0
 DEFAULT_SEED = 1
+DEFAULT_SHAPE = "blobs"
 DEFAULT_MIN_CLUSTER_SIZE = 5
 DEFAULT_MIN_SAMPLES = 5
 
@@ -19,22 +20,31 @@ MIN_SAMPLES_MIN, MIN_SAMPLES_MAX = 2, 15
 MAX_BRIDGE_POINTS = 80
 
 RING_RADIUS = 2.0
+ARC_RADIUS = 1.7
+ARC_RING_RADIUS = 4.5
+
+SHAPES = ("blobs", "moons")
+SHAPE_LABELS = {"blobs": "Gruppen (Blobs)", "moons": "Halbmonde"}
 
 PRESETS = {
     "Einfaches Beispiel": {
         "n_points": 90, "k": 3, "spread": 0.15, "density_imbalance": 0.0,
-        "bridge_strength": 0.0, "min_cluster_size": 5, "min_samples": 5, "seed": 1,
+        "bridge_strength": 0.0, "shape": "blobs", "min_cluster_size": 5, "min_samples": 5, "seed": 1,
     },
     "Der Fall, an dem DBSCAN scheiterte": {
         "n_points": 150, "k": 2, "spread": 0.15, "density_imbalance": 0.9,
-        "bridge_strength": 0.0, "min_cluster_size": 5, "min_samples": 5, "seed": 3,
+        "bridge_strength": 0.0, "shape": "blobs", "min_cluster_size": 5, "min_samples": 5, "seed": 3,
     },
     "Der Fall, an dem Single-Linkage scheiterte": {
         "n_points": 100, "k": 2, "spread": 0.225, "density_imbalance": 0.0,
-        "bridge_strength": 0.32, "min_cluster_size": 5, "min_samples": 5, "seed": 2,
+        "bridge_strength": 0.32, "shape": "blobs", "min_cluster_size": 5, "min_samples": 5, "seed": 2,
     },
     "Kombinierter Härtefall": {
         "n_points": 150, "k": 2, "spread": 0.2, "density_imbalance": 0.7,
-        "bridge_strength": 0.3, "min_cluster_size": 5, "min_samples": 5, "seed": 5,
+        "bridge_strength": 0.3, "shape": "blobs", "min_cluster_size": 5, "min_samples": 5, "seed": 5,
+    },
+    "Nicht-konvexe Formen (auch das meistert HDBSCAN)": {
+        "n_points": 150, "k": 2, "spread": 0.1, "density_imbalance": 0.0,
+        "bridge_strength": 0.0, "shape": "moons", "min_cluster_size": 10, "min_samples": 10, "seed": 1,
     },
 }

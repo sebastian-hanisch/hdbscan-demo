@@ -37,8 +37,8 @@ st.set_page_config(page_title="HDBSCAN – Sebastian Hanisch", layout="wide")
 
 
 @st.cache_data(show_spinner=False)
-def _compute_run(n_points, k, spread, density_imbalance, bridge_strength, seed, min_cluster_size, min_samples):
-    instance = generate_instance(n_points, k, spread, density_imbalance, bridge_strength, seed)
+def _compute_run(n_points, k, spread, density_imbalance, bridge_strength, shape, seed, min_cluster_size, min_samples):
+    instance = generate_instance(n_points, k, spread, density_imbalance, bridge_strength, seed, shape=shape)
     result = run(instance.as_array(), min_cluster_size, min_samples)
     return instance, result
 
@@ -102,6 +102,7 @@ PRESET_HELP = {
     "Der Fall, an dem DBSCAN scheiterte": "Starkes Dichte-Ungleichgewicht - HDBSCAN braucht kein eps und bedient beide Dichten gut.",
     "Der Fall, an dem Single-Linkage scheiterte": "Eine dünne Punktbrücke - Mutual-Reachability-Distanz verhindert das Chaining, das rohes Single-Linkage zum Scheitern brachte.",
     "Kombinierter Härtefall": "Dichte-Ungleichgewicht UND Brücke gleichzeitig - der eigentliche Beweis, dass die Kombination mehr kann als jede Zutat allein.",
+    "Nicht-konvexe Formen (auch das meistert HDBSCAN)": "Zwei ineinander verschlungene Halbmonde, ganz ohne eps - HDBSCAN braucht dafür etwas größere min_cluster_size/min_samples-Werte als bei runden Gruppen, meistert die Form aber genauso wie DBSCAN.",
 }
 preset_cols = st.columns(len(C.PRESETS))
 for i, name in enumerate(C.PRESETS.keys()):
@@ -137,6 +138,13 @@ with st.sidebar:
     )
     seed = st.number_input("Zufalls-Seed", *bounds("seed_input"), key="seed_input", step=1)
 
+    st.markdown("**Punktwolken-Form**")
+    shape = st.radio(
+        "Form", options=C.SHAPES, key="shape_radio", format_func=lambda s: C.SHAPE_LABELS[s],
+        help="„Gruppen“: runde, konvexe Cluster. „Halbmonde“: nicht-konvexe Bögen - Dichte-"
+        "Ungleichgewicht und Brücken-Stärke wirken auf beide Formen.",
+    )
+
     st.markdown("**HDBSCAN-Parameter**")
     min_cluster_size = st.slider(
         "min_cluster_size", *bounds("min_cluster_size_slider"), key="min_cluster_size_slider",
@@ -156,16 +164,18 @@ with st.sidebar:
         help="Würfelt einen neuen Zufalls-Seed für die Adressen.",
     )
 
-sync_query_params(n_points, k, spread, density_imbalance, bridge_strength, seed, min_cluster_size, min_samples)
+sync_query_params(
+    n_points, k, spread, density_imbalance, bridge_strength, seed, shape, min_cluster_size, min_samples
+)
 
 with st.spinner("Führe HDBSCAN aus..."):
     instance, result = _compute_run(
-        int(n_points), int(k), spread, density_imbalance, bridge_strength, int(seed),
+        int(n_points), int(k), spread, density_imbalance, bridge_strength, shape, int(seed),
         int(min_cluster_size), int(min_samples),
     )
 
 max_step = len(result.merges) - 1
-run_key = (n_points, k, spread, density_imbalance, bridge_strength, seed, min_cluster_size, min_samples)
+run_key = (n_points, k, spread, density_imbalance, bridge_strength, shape, seed, min_cluster_size, min_samples)
 if "hb_step" not in st.session_state or st.session_state.get("hb_step_owner") != run_key:
     st.session_state["hb_step"] = max_step
     st.session_state["hb_step_owner"] = run_key
