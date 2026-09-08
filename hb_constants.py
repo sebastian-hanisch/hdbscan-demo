@@ -47,4 +47,8 @@ PRESETS = {
         "n_points": 150, "k": 2, "spread": 0.1, "density_imbalance": 0.0,
         "bridge_strength": 0.0, "shape": "moons", "min_cluster_size": 10, "min_samples": 10, "seed": 1,
     },
+    "Wo die harte Grenze täuscht (Soft Clustering hilft)": {
+        "n_points": 120, "k": 2, "spread": 0.45, "density_imbalance": 0.0,
+        "bridge_strength": 0.0, "shape": "blobs", "min_cluster_size": 5, "min_samples": 5, "seed": 1,
+    },
 }

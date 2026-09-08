@@ -11,10 +11,11 @@ exakt jene Härtefälle und zeigen live, dass HDBSCAN beide löst. Fünftes Stü
 Lauffähig mit: streamlit run app.py
 """
 
+import numpy as np
 import streamlit as st
 
 import hb_constants as C
-from hb_algorithm import labels_at_step, run
+from hb_algorithm import labels_at_step, run, soft_cluster_membership
 from hb_evaluation import per_group_noise_fraction, rand_index
 from hb_presets import (
     apply_preset,
@@ -46,6 +47,12 @@ def _compute_run(n_points, k, spread, density_imbalance, bridge_strength, shape,
 @st.cache_data(show_spinner=False)
 def _compute_mini_run(instance, min_cluster_size, min_samples):
     return run(instance.as_array(), min_cluster_size, min_samples)
+
+
+@st.cache_data(show_spinner=False)
+def _compute_soft_membership(instance, min_cluster_size, min_samples):
+    result = run(instance.as_array(), min_cluster_size, min_samples)
+    return soft_cluster_membership(instance.as_array(), result)
 
 
 st.title("🧩 HDBSCAN: die Kombination, die Dichte UND Chaining löst")
@@ -103,6 +110,7 @@ PRESET_HELP = {
     "Der Fall, an dem Single-Linkage scheiterte": "Eine dünne Punktbrücke - Mutual-Reachability-Distanz verhindert das Chaining, das rohes Single-Linkage zum Scheitern brachte.",
     "Kombinierter Härtefall": "Dichte-Ungleichgewicht UND Brücke gleichzeitig - der eigentliche Beweis, dass die Kombination mehr kann als jede Zutat allein.",
     "Nicht-konvexe Formen (auch das meistert HDBSCAN)": "Zwei ineinander verschlungene Halbmonde, ganz ohne eps - HDBSCAN braucht dafür etwas größere min_cluster_size/min_samples-Werte als bei runden Gruppen, meistert die Form aber genauso wie DBSCAN.",
+    "Wo die harte Grenze täuscht (Soft Clustering hilft)": "Deutlich überlappende Gruppen - die harte Ja/Nein-Zuordnung verdeckt, wie unsicher manche Punkte tatsächlich sind. Soft Clustering (weiter unten) macht diese Unsicherheit sichtbar.",
 }
 preset_cols = st.columns(len(C.PRESETS))
 for i, name in enumerate(C.PRESETS.keys()):
@@ -302,6 +310,77 @@ else:
 
 st.markdown("---")
 
+st.subheader("📐 Wie eindeutig ist die Cluster-Zuordnung wirklich?")
+st.markdown(
+    """
+Jeder Punkt oben bekommt eine harte Ja/Nein-Zuordnung - Cluster oder Noise, ohne
+Abstufung. Der kondensierte Baum enthält aber schon genug Information für eine
+**abgestufte** Zuordnung: **Soft Clustering** (McInnes & Healy, siehe die
+`hdbscan`-Referenzbibliothek) kombiniert zwei Signale je Punkt und Cluster - die
+**Nähe** zu den "Exemplaren" eines Clusters (den Punkten, die innerhalb ihres Astes am
+längsten überlebt haben) und die **Persistenz** (wie weit der Baum vom Punkt zum
+Cluster hochgeklettert werden muss, relativ zur eigenen Lebensdauer des Punktes) - und
+skaliert das Ergebnis mit einer Gesamt-Konfidenz, wie sehr der Punkt überhaupt
+irgendeinem Cluster nahe ist statt Rauschen.
+    """
+)
+
+with st.spinner("Berechne weiche Cluster-Zuordnung..."):
+    soft_matrix, soft_clusters = _compute_soft_membership(instance, int(min_cluster_size), int(min_samples))
+
+if not soft_clusters:
+    st.info("Kein Cluster gefunden - Soft Clustering hat hier nichts zu differenzieren.")
+else:
+    row_max = soft_matrix.max(axis=1)
+    final_arr_soft = np.array(result.final_labels)
+    non_noise_soft = final_arr_soft != -1
+    mean_confidence = float(row_max[non_noise_soft].mean()) if non_noise_soft.any() else float("nan")
+
+    sorted_probs = -np.sort(-soft_matrix, axis=1)
+    top_gap = sorted_probs[:, 0] - (sorted_probs[:, 1] if sorted_probs.shape[1] > 1 else 0.0)
+    near_tie_mask = non_noise_soft & (top_gap < 0.15)
+    n_near_tie = int(near_tie_mask.sum())
+
+    sc1, sc2 = st.columns(2)
+    sc1.metric(
+        "Mittlere Zuordnungs-Konfidenz", f"{mean_confidence:.2f}",
+        help="Mittelwert der wahrscheinlichsten Cluster-Zugehörigkeit über alle NICHT als "
+        "Noise markierten Punkte - 1.0 bedeutet, jeder Punkt gehört mit voller Sicherheit "
+        "zu genau einem Cluster. Liegt strukturell auch bei sauber getrennten Gruppen selten "
+        "bei exakt 1.0 - Gauß-verteilte Punkte am Rand eines Blobs haben immer eine gewisse, "
+        "wenn auch kleine Distanz zu benachbarten Clustern.",
+    )
+    sc2.metric(
+        "Punkte mit echtem Fast-Gleichstand", f"{n_near_tie}/{int(non_noise_soft.sum())}",
+        help="Nicht als Noise markierte Punkte, bei denen die beiden wahrscheinlichsten "
+        "Cluster weniger als 15 Prozentpunkte auseinanderliegen - eine ECHTE, nahezu "
+        "hälftige Aufteilung, nicht nur eine unter 100% liegende Konfidenz.",
+    )
+
+    st.plotly_chart(
+        build_scatter_figure(instance, result.final_labels, confidence=row_max), width="stretch",
+        key="soft_cluster_scatter",
+    )
+    st.caption(
+        "Gleiche Farben wie oben, aber Transparenz = Zuordnungs-Konfidenz: blasse Punkte "
+        "sind sich ihres Clusters deutlich weniger sicher als kräftig gefärbte."
+    )
+
+    if n_near_tie >= 2:
+        st.success(
+            f"✅ {n_near_tie} Punkte haben einen echten Fast-Gleichstand zwischen zwei "
+            f"Clustern (unter 15 Prozentpunkten Unterschied) - die harte Grenze oben "
+            f"verschluckt genau diese Unsicherheit, Soft Clustering macht sie sichtbar."
+        )
+    else:
+        st.info(
+            "Bei diesem Szenario sind die meisten Punkte bereits eindeutig zugeordnet - "
+            "probieren Sie das Preset „Wo die harte Grenze täuscht“ oder erhöhen Sie die "
+            "Streuung, um echte Grenzfälle zu erzeugen."
+        )
+
+st.markdown("---")
+
 with st.expander("📐 Mathematische Formulierung"):
     st.markdown(
         r"""
@@ -343,8 +422,25 @@ einziges Cluster" ist damit ausgeschlossen.
 Naive Laufzeit $O(n^3)$ für die Hierarchie (wie in agglomerative-demo) - produktive
 Implementierungen nutzen eine Boruvka-MST-Variante mit $O(n \log n)$.
 
-Implementiert in `hb_algorithm.py` (vollständige Pipeline) und `hb_evaluation.py`
-(Rand-Index, Noise-Anteil je Gruppe).
+**Soft Clustering** (McInnes & Healy, siehe die `hdbscan`-Referenzbibliothek):
+kombiniert zwei Signale je Punkt $p$ und ausgewähltem Cluster $C$ zu einer weichen
+Mitgliedschafts-Wahrscheinlichkeit, statt nur "gehört dazu oder nicht":
+
+- **Distanz-Signal**: $1 / \min_{e \in \text{Exemplare}(C)} \lVert p - e \rVert$, normiert
+  über alle Cluster - Nähe zu den Punkten, die innerhalb ihres jeweiligen Astes am
+  längsten überlebt haben (den dichtesten Kern von $C$).
+- **Persistenz-Signal**: $\exp\!\big(-\lambda_{\max}(p) / h(p, C)\big)$, wobei $h(p, C)$ das
+  Lambda ist, bei dem sich die Äste von $p$ und $C$ zuletzt trennen (ihr niedrigster
+  gemeinsamer Vorfahre) - ein Punkt, dessen eigener Ast nah bei $C$ endet, ist dessen
+  Mitgliedschaft sehr sicher.
+
+Beide werden multipliziert, renormiert und mit einer clusterunabhängigen
+Gesamt-Konfidenz skaliert (wie weit $p$ überhaupt von IRGENDEINEM Cluster entfernt ist,
+statt Rauschen) - echte Rausch-Punkte erhalten dadurch insgesamt wenig
+Wahrscheinlichkeitsmasse, nicht nur eine flache Verteilung über alle Cluster.
+
+Implementiert in `hb_algorithm.py` (vollständige Pipeline, inkl. `soft_cluster_
+membership`) und `hb_evaluation.py` (Rand-Index, Noise-Anteil je Gruppe).
         """
     )
 

@@ -24,6 +24,15 @@ Vergleich) zeigt diese Demo **ein** Verfahren – HDBSCAN selbst, nicht eine vie
 Methode neben k-Means/DBSCAN/agglomerativem Clustering. Vehikel-Problem: Lieferadressen
 zu Sammel-Routen gruppieren, **ohne eps festlegen zu müssen UND ohne Chaining-Risiko**.
 
+**Nachtrag**: die Demo zeigt inzwischen auch **Soft Clustering** (McInnes & Healy, siehe
+die `hdbscan`-Referenzbibliothek) - dieselbe Idee, mit der [gmm-demo](../gmm-demo)
+k-Means' harte Zuordnung fixt, hier auf HDBSCANs eigenen kondensierten Baum angewendet:
+statt Cluster-oder-Noise gibt es eine abgestufte Wahrscheinlichkeit je Cluster, berechnet
+aus Nähe zu den persistentesten Kernpunkten jedes Clusters UND wie weit der Baum vom
+Punkt zum Cluster hochgeklettert werden muss. Als Feature der bestehenden Demo umgesetzt
+(nicht als neues Konzepte-Stück), weil es exakt denselben bereits berechneten Baum
+weiterverwendet, keine andere Methode ist.
+
 ## Warum diese Demo anders aufgebaut ist
 
 - **Einfaches Beispiel**: gleichmäßige Dichte, keine Brücke - Baseline.
@@ -38,6 +47,10 @@ zu Sammel-Routen gruppieren, **ohne eps festlegen zu müssen UND ohne Chaining-R
 - **Kombinierter Härtefall**: beides gleichzeitig - Rand-Index und Noise-Anteil bleiben
   auch hier gut, der eigentliche Beweis, dass die Kombination mehr kann als jede Zutat
   allein.
+- **Wo die harte Grenze täuscht (Soft Clustering hilft)**: deutlich überlappende Gruppen
+  (Streuung 0.45 bei nur zwei Zentren) - HDBSCAN findet weiterhin genau 2 Cluster, aber
+  mehrere Punkte haben einen echten Fast-Gleichstand zwischen beiden, den die harte
+  Zuordnung verschluckt.
 
 ## Visualisierung
 
@@ -74,6 +87,13 @@ gefunden:
 - **Die beiden zentralen Nachweise direkt getestet**: HDBSCAN erreicht <10% Noise je
   Gruppe auf dem geerbten DBSCAN-Härtefall, und einen Rand-Index >0.9 auf dem geerbten
   Single-Linkage-Härtefall.
+- **Soft Clustering eigens getestet**: Werte sind gültige Wahrscheinlichkeiten (Zeilen-
+  summe ≤ 1), das wahrscheinlichste Cluster stimmt für JEDEN hart zugeordneten Punkt mit
+  dessen tatsächlichem Cluster überein (Selbstkonsistenz), Rausch-Punkte erhalten
+  deutlich weniger Gesamt-Wahrscheinlichkeitsmasse als zugeordnete Punkte, sowie ein
+  unabhängiger Kreuzvergleich gegen `hdbscan.prediction.all_points_membership_vectors`
+  (nach Cluster-Nummerierungs-Angleichung: perfekte Übereinstimmung im wahrscheinlichsten
+  Cluster, Korrelation 0.9+ bei der Gesamt-Konfidenz je Punkt, über mehrere Szenarien).
 
 Zwei bemerkenswerte Bugs unterwegs (Details in [[project_hdbscan_demo_venv]]): die
 Stabilitätsformel zählte zunächst eine Fusion doppelt, und die Cluster-Auswahl ließ
@@ -90,14 +110,14 @@ eigentliches Versprechen.
 
 | Datei | Inhalt |
 |---|---|
-| `app.py` | Streamlit-Hauptablauf: Presets, Einstellungen, rohe Zwischenpartition, kondensierter Baum, finales Ergebnis, Kleinmultiples, Härtefall-Nachweis, Formulierungs-Expander |
+| `app.py` | Streamlit-Hauptablauf: Presets, Einstellungen, rohe Zwischenpartition, kondensierter Baum, finales Ergebnis, Kleinmultiples, Härtefall-Nachweis, Soft-Clustering-Sektion, Formulierungs-Expander |
 | `hb_constants.py` | Defaults, Regler-Grenzen, Sicherheitsgrenzen, `PRESETS` |
 | `hb_presets.py` | `SettingSpec`/`SETTING_SPECS`, Permalink-Logik, Presets, Zufalls-Seed-Button |
 | `hb_scenario.py` | Kombinierter Generator: Gauß-Gruppen mit Dichte-Ungleichgewicht UND optionaler Punktbrücke, unabhängig einstellbar |
-| `hb_algorithm.py` | Kern-Distanz, Mutual-Reachability-Distanz, Single-Linkage auf dieser Distanz, kondensierter Baum, Stabilität, Excess-of-Mass-Auswahl, finale Labels |
+| `hb_algorithm.py` | Kern-Distanz, Mutual-Reachability-Distanz, Single-Linkage auf dieser Distanz, kondensierter Baum, Stabilität, Excess-of-Mass-Auswahl, finale Labels, Soft Clustering (`soft_cluster_membership`) |
 | `hb_evaluation.py` | Rand-Index, Noise-Anteil je wahrer Gruppe |
-| `hb_visualization.py` | Dendrogramm-, Scatter-, kondensierter-Baum- und Noise-Balkendiagramm (Plotly) |
-| `tests/` | Handinstanzen, sklearn-Kreuzvergleich, Struktur-Invarianten, die beiden zentralen Härtefall-Nachweise |
+| `hb_visualization.py` | Dendrogramm-, Scatter- (mit optionaler Konfidenz-Transparenz), kondensierter-Baum- und Noise-Balkendiagramm (Plotly) |
+| `tests/` | Handinstanzen, sklearn-Kreuzvergleich, Struktur-Invarianten, die beiden zentralen Härtefall-Nachweise, Soft-Clustering-Tests inkl. `hdbscan`-Kreuzvergleich |
 
 ## Lokal ausführen
 

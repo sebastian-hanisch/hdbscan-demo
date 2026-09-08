@@ -37,7 +37,12 @@ def _cluster_color(index, n_clusters):
     return f"hsl({hue:.1f}, 65%, 50%)"
 
 
-def _cluster_traces(data, labels, legend):
+def _cluster_traces(data, labels, legend, confidence=None):
+    """confidence (optional, array in [0, 1] je Punkt): mappt sich auf Marker-Opacity der
+    Cluster-Punkte (NICHT der Noise-Punkte, die bleiben immer gleich subtil) - visualisiert
+    weiche Zuordnungs-Konfidenz (Soft Clustering) ueber die bestehende harte Faerbung
+    hinweg, ohne eine zweite Grafik zu brauchen. Auf [0.25, 1.0] gestaucht, damit selbst
+    sehr unsichere Punkte noch sichtbar bleiben statt fast zu verschwinden."""
     import plotly.graph_objects as go
 
     traces = []
@@ -58,23 +63,24 @@ def _cluster_traces(data, labels, legend):
     for index, cid in enumerate(cluster_ids):
         mask = labels == cid
         color = _cluster_color(index, n_clusters)
+        marker = dict(color=color, size=7, line=dict(width=0.5, color="white"))
+        if confidence is not None:
+            marker["opacity"] = (0.25 + 0.75 * confidence[mask]).tolist()
         traces.append(
             go.Scatter(
                 x=data[mask, 0], y=data[mask, 1], mode="markers", name=f"Cluster {cid + 1}",
-                showlegend=show_legend,
-                marker=dict(color=color, size=7, line=dict(width=0.5, color="white")),
-                hoverinfo="skip",
+                showlegend=show_legend, marker=marker, hoverinfo="skip",
             )
         )
     return traces
 
 
-def build_scatter_figure(instance, labels, legend=True, height=460):
+def build_scatter_figure(instance, labels, legend=True, height=460, confidence=None):
     import plotly.graph_objects as go
 
     data = np.array(instance.points)
     fig = go.Figure()
-    for trace in _cluster_traces(data, np.array(labels), legend):
+    for trace in _cluster_traces(data, np.array(labels), legend, confidence=confidence):
         fig.add_trace(trace)
 
     xr, yr = _axis_range(data)
